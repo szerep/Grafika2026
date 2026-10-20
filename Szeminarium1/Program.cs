@@ -234,7 +234,8 @@ namespace Szeminarium1
 
             // szin attributumot kikapcsoljuk, hogy legyenek feketek a vonalak
             Gl.DisableVertexAttribArray(1);
-            // 12 - 24 kozotti pontokbol vonalakat rajzolunk, 24 pontbol 12 vonal lesz, 2 vegpont egy vonalhoz
+            // A 12-es indextol 24 pontot rajzolunk ki
+            // 24 pont = 12 vonal, mert minden vonalhoz 2 vegpont kell
             Gl.DrawArrays(GLEnum.Lines, 12, 24);
 
             // always unbound the vertex buffer first, so no halfway results are displayed by accident
