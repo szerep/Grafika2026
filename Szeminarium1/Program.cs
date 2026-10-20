@@ -141,6 +141,41 @@ namespace Szeminarium1
                 0.0f, -1.0f, 0.0f, // Also 9 - ez a bal laphoz
                 0.0f, -1.0f, 0.0f, // Also 10 - ez a jobb laphoz
                 0.8f, -0.5f, 0.0f, // Jobb also 11 - ez a jobb laphoz
+
+                // Pontok a vonalakhoz, felosztva egy vonal 0, 1/3, 2/3, 1 reszekre
+                // 1/3 pont: kezdoertek + (vegpont - kezdoertek) / 3
+                // 2/3 pont: kezdoertek + (vegpont - kezdoertek) * 2 / 3
+                // a Szemkozti oldalak 1/3 es 2/3 pontjai jonnek egymas utan parba
+
+                // Felso lap - 4 belso vonal
+                0.2667f,  0.8333f, 0f,
+                -0.5333f,  0.3333f, 0f,
+                0.5333f,  0.6667f, 0f,
+                -0.2667f,  0.1667f, 0f,
+                -0.2667f,  0.8333f, 0f,
+                0.5333f,  0.3333f, 0f,
+                -0.5333f,  0.6667f, 0f,
+                0.2667f,  0.1667f, 0f,
+
+                // Bal lap - 4 belso vonal
+                -0.5333f,  0.3333f, 0f,
+                -0.5333f, -0.6667f, 0f,
+                -0.2667f,  0.1667f, 0f,
+                -0.2667f, -0.8333f, 0f,
+                -0.8f,     0.1667f, 0f,
+                0f,      -0.3333f, 0f,
+                -0.8f,    -0.1667f, 0f,
+                0f,      -0.6667f, 0f,
+
+                // Jobb lap - 4 belso vonal
+                0.2667f,  0.1667f, 0f,
+                0.2667f, -0.8333f, 0f,
+                0.5333f,  0.3333f, 0f,
+                0.5333f, -0.6667f, 0f,
+                0f,      -0.3333f, 0f,
+                0.8f,     0.1667f, 0f,
+                0f,      -0.6667f, 0f,
+                0.8f,    -0.1667f, 0f
             };
 
             float[] colorArray = new float[] {
@@ -196,6 +231,11 @@ namespace Szeminarium1
             CheckError("Render: DrawElements");
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, 0);
             Gl.BindVertexArray(vao);
+
+            // szin attributumot kikapcsoljuk, hogy legyenek feketek a vonalak
+            Gl.DisableVertexAttribArray(1);
+            // 12 - 24 kozotti pontokbol vonalakat rajzolunk, 24 pontbol 12 vonal lesz, 2 vegpont egy vonalhoz
+            Gl.DrawArrays(GLEnum.Lines, 12, 24);
 
             // always unbound the vertex buffer first, so no halfway results are displayed by accident
             Gl.DeleteBuffer(vertices);
