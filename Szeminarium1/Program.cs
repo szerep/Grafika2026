@@ -18,9 +18,6 @@ namespace Szeminarium1
                 Console.WriteLine($"GL hiba [{lepes}]: {hiba}");
         }
 
-        // 'verison 330 core' torlese -> forditasi hiba
-        // ha cserelem a location szamokat, akkor a szinek/alakzatok elcsusznak
-        // outCol valtozo atnevezese -> linkelesi hiba
         private static readonly string VertexShaderSource = @"
         #version 330 core
         layout (location = 0) in vec3 vPos;
@@ -78,15 +75,13 @@ namespace Szeminarium1
             CheckError("Load: CreateShader");
 
             Gl.ShaderSource(vshader, VertexShaderSource);
-            Gl.CompileShader(vshader); // vertex shader failed to compile
+            Gl.CompileShader(vshader);
             Gl.GetShader(vshader, ShaderParameterName.CompileStatus, out int vStatus);
             if (vStatus != (int)GLEnum.True)
                 throw new Exception("Vertex shader failed to compile: " + Gl.GetShaderInfoLog(vshader));
             CheckError("Load: vertex shader fordítás");
 
-            // HA felcserelem a CompileShader es ShaderSource sorrendet, akkor a shader forditas sikertelen lesz -> nem rajzol ki semmit a program
             Gl.ShaderSource(fshader, FragmentShaderSource);
-            // Ha kihagyom a ShaderSource hivasat akkor semmit se rajzol ki
             Gl.CompileShader(fshader);
             // fragment shader forditasat is ellenorizzuk
             Gl.GetShader(fshader, ShaderParameterName.CompileStatus, out int fStatus);
@@ -97,11 +92,8 @@ namespace Szeminarium1
 
             program = Gl.CreateProgram();
             Gl.AttachShader(program, vshader);
-            // AttachShaer(fshader) torlese -> fekete lesz a kep, de a shader forditas sikeres lesz
-            Gl.AttachShader(program, fshader); // GL hiba [Load: Detach/DeleteShader]: InvalidOperation
+            Gl.AttachShader(program, fshader);
             CheckError("Load: AttachShader");
-            // Ugyan ugy fekete ha a LinkProgram-ot az AttachShader(fshader) elott hivom meg
-            // Ha a DetachShader es DeleteShader a LinkProgram ele kerul, a rajz fekete lesz
             Gl.LinkProgram(program);
             CheckError("Load: LinkProgram");
             Gl.DetachShader(program, vshader);
@@ -132,52 +124,61 @@ namespace Szeminarium1
             Gl.Clear(ClearBufferMask.ColorBufferBit);
             CheckError("Render: Clear");
 
-            //vao vagy a bindeles torlese -> nem lesz rajz
             uint vao = Gl.GenVertexArray();
             Gl.BindVertexArray(vao);
             CheckError("Render: VAO létrehozás/bind");
 
-            // szam torlese / modositasa -> az alakzat elcsuszik
             float[] vertexArray = new float[] {
-                -0.5f, -0.5f, 0.0f,
-                +0.5f, -0.5f, 0.0f,
-                 0.0f, +0.5f, 0.0f,
-                 1f, 1f, 0f
+                0.0f, 1.0f, 0.0f, // Teteje 0 - ez a felso laphoz
+                -0.8f, 0.5f, 0.0f, // Bal felso 1 - ez a felso laphoz
+                -0.8f, 0.5f, 0.0f, // Bal felso 2 - ez a bal laphoz
+                0.0f, 0.0f, 0.0f, // Kozep 3 - ez a felso laphoz
+                0.0f, 0.0f, 0.0f, // Kozep 4 - ez a bal laphoz
+                0.0f, 0.0f, 0.0f, // Kozep 5 - ez a jobb laphoz
+                0.8f, 0.5f, 0.0f, // Jobb felso 6 - ez a felso laphoz
+                0.8f, 0.5f, 0.0f, // Jobb felso 7 - ez a jobb laphoz
+                -0.8f, -0.5f, 0.0f, // Bal also 8 - ez a bal laphoz
+                0.0f, -1.0f, 0.0f, // Also 9 - ez a bal laphoz
+                0.0f, -1.0f, 0.0f, // Also 10 - ez a jobb laphoz
+                0.8f, -0.5f, 0.0f, // Jobb also 11 - ez a jobb laphoz
             };
 
-            // szam torlese / modositasa -> a szinek elcsusznak
             float[] colorArray = new float[] {
-                1.0f, 0.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 0.0f, 1.0f,
+                1.0f, 0.0f, 0.0f, 1.0f, // Teteje 0 - piros
+                1.0f, 0.0f, 0.0f, 1.0f, // Bal felso 1 - piros
+                0.0f, 1.0f, 0.0f, 1.0f, // Bal felso 2 - zold
+                1.0f, 0.0f, 0.0f, 1.0f, // Kozep 3 - piros
+                0.0f, 1.0f, 0.0f, 1.0f, // Kozep 4 - zold
+                0.0f, 0.0f, 1.0f, 1.0f, // Kozep 5 - kek
+                1.0f, 0.0f, 0.0f, 1.0f, // Jobb felso 6 - piros
+                0.0f, 0.0f, 1.0f, 1.0f, // Jobb felso 7 - kek
+                0.0f, 1.0f, 0.0f, 1.0f, // Bal also 8 - zold
+                0.0f, 1.0f, 0.0f, 1.0f, // Also 9 - zold
+                0.0f, 0.0f, 1.0f, 1.0f, // Also 10 - kek
+                0.0f, 0.0f, 1.0f, 1.0f, // Jobb also 11 - kek
             };
 
-            // Ha torlok egy indexet akkor csak egyik haromszog jelenik meg
             uint[] indexArray = new uint[] { 
-                0, 1, 2,
-                2, 1, 3
+                0, 1, 3, // Teteje, Bal felso, Kozep -> Felso lap bal oldala 
+                0, 3, 6, // Teteje, Kozep, Jobb felso -> Felso lap jobb oldala
+                2, 8, 9, // Bal felso, Bal also, Also -> Bal lap also oldala
+                2, 9, 4, // Bal felso, Also, Kozep -> Bal lap felso oldala
+                5, 10, 7, // Kozep, Also, Jobb felso -> Jobb lap felso oldala
+                7, 10, 11, // Jobb felso, Also, Jobb also -> Jobb lap also oldala
             };
 
             uint vertices = Gl.GenBuffer();
-            // Bindbuffer torlese -> nem lesz rajz, nem indul a program
             Gl.BindBuffer(GLEnum.ArrayBuffer, vertices);
             Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)vertexArray.AsSpan(), GLEnum.StaticDraw);
-            // meret 3- > 5 nem fut le
             Gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, null); // Invalid Value az 5-os
-            Gl.EnableVertexAttribArray(0); // ha ez 1 akkor nem rajzolodik ki semmi
+            Gl.EnableVertexAttribArray(0);
             CheckError("Render: vertices buffer + attribútum 0");
 
             uint colors = Gl.GenBuffer();
-            // Bindbuffer torlese -> nem lesz rajz, nem indul a program
             Gl.BindBuffer(GLEnum.ArrayBuffer, colors);
 
-            // BufferData torlese -> nem lesz rajz, nem indul a program
             Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)colorArray.AsSpan(), GLEnum.StaticDraw);
-            // meret 4- > 3 a szinek elcsusznak, 4- > 5 nem fut le
             Gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, 0, null);
-            // torles fekete haromszogeket ad
-            // parameterv altoztatasa fekete lesz a rajz
             Gl.EnableVertexAttribArray(1);
             CheckError("Render: colors buffer + attribútum 1");
 
@@ -188,7 +189,6 @@ namespace Szeminarium1
 
             Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
 
-            // UserProgram torlese -> fekete haromszogeket ad
             Gl.UseProgram(program);
             CheckError("Render: UseProgram");
 
