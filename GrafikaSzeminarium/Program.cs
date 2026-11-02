@@ -22,13 +22,20 @@ namespace GrafikaSzeminarium
         private const string ModelMatrixVariableName = "uModel";
         private const string ViewMatrixVariableName = "uView";
         private const string ProjectionMatrixVariableName = "uProjection";
-
+        private const string SliceRotationVariableName = "uSliceRotation";
         // kamera hol all, es merre nez
         private static Vector3D<float> cameraPosition = new Vector3D<float>(4f, 3f, 6f);
         private static float cameraYaw = -0.59f;
         private static float cameraPitch = -0.39f;
         private const float MoveStep = 0.3f;
         private const float TurnStep = 0.05f;
+
+        // a felso reteg forgtasa: az akt es a cel szog
+        private static float sliceAngle = 0f;
+        private static float sliceTargetAngle = 0f;
+
+        // forgas sebessege: 90 fok (PI/2) / mp
+        private const float SliceSpeed = MathF.PI / 2;
 
         private static readonly string VertexShaderSource = @"
         #version 330 core
@@ -38,13 +45,14 @@ namespace GrafikaSzeminarium
         uniform mat4 uModel;
         uniform mat4 uView;
         uniform mat4 uProjection;
+        uniform mat4 uSliceRotation;   // szelet forgatasa
 
 		out vec4 outCol;
         
         void main()
         {
 			outCol = vCol;
-            gl_Position = uProjection*uView*uModel*vec4(vPos.x, vPos.y, vPos.z, 1.0);
+            gl_Position = uProjection*uView*uSliceRotation*uModel*vec4(vPos.x, vPos.y, vPos.z, 1.0);
         }
         ";
 
@@ -177,7 +185,10 @@ namespace GrafikaSzeminarium
                 case Key.Down: cameraPitch -= TurnStep; break;   // lefelé néz
 
                 case Key.Space:
-                    cubeArrangementModel.AnimationEnabled = !cubeArrangementModel.AnimationEnabled;
+                    sliceTargetAngle += MathF.PI / 2;   // +90 fok az egyik iranyba
+                    break;
+                case Key.Backspace:
+                    sliceTargetAngle -= MathF.PI / 2;   // -90 fok a masik iranyba
                     break;
             }
 
@@ -189,6 +200,13 @@ namespace GrafikaSzeminarium
             // NO OpenGL
             // make it threadsafe
             cubeArrangementModel.AdvanceTime(deltaTime);
+            // egy kepkockanal ennyit fordulhat
+            float step = SliceSpeed * (float)deltaTime;
+
+            if (sliceAngle < sliceTargetAngle)
+                sliceAngle = MathF.Min(sliceAngle + step, sliceTargetAngle);   // nem lovi tul a celt
+            else if (sliceAngle > sliceTargetAngle)
+                sliceAngle = MathF.Max(sliceAngle - step, sliceTargetAngle);
         }
 
         private static unsafe void GraphicWindow_Render(double deltaTime)
@@ -209,6 +227,11 @@ namespace GrafikaSzeminarium
                         // 0.9-re kicsinyitjuk, igy 0.1 res marad a kockak kozott, aztan a helyere toljuk
                         var modelMatrix = Matrix4X4.CreateScale(0.9f) * Matrix4X4.CreateTranslation((float)x, (float)y, (float)z);
                         SetMatrix(modelMatrix, ModelMatrixVariableName);
+                        // a felso reteg (y == 1) kapja a forgatast, a tobbi egysegmatrixot
+                        Matrix4X4<float> sliceRotation = Matrix4X4<float>.Identity;
+                        if (y == 1)
+                            sliceRotation = Matrix4X4.CreateRotationY(sliceAngle);
+                        SetMatrix(sliceRotation, SliceRotationVariableName);
                         DrawModelObject(cubes[x + 1, y + 1, z + 1]);
                     }
         }
