@@ -21,7 +21,7 @@ namespace GrafikaSzeminarium
 
         private GL Gl;
 
-        public unsafe static ModelObjectDescriptor CreateCube(GL Gl)
+        public unsafe static ModelObjectDescriptor CreateCube(GL Gl, float[] colorArray)
         {
             uint vao = Gl.GenVertexArray();
             Gl.BindVertexArray(vao);
@@ -58,38 +58,6 @@ namespace GrafikaSzeminarium
                 0.5f, -0.5f, -0.5f,
                 0.5f, -0.5f, 0.5f,
 
-            };
-
-            float[] colorArray = new float[] {
-                1.0f, 0.0f, 0.0f, 1.0f,
-                1.0f, 0.0f, 0.0f, 1.0f,
-                1.0f, 0.0f, 0.0f, 1.0f,
-                1.0f, 0.0f, 0.0f, 1.0f,
-
-                0.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
-
-                0.0f, 0.0f, 1.0f, 1.0f,
-                0.0f, 0.0f, 1.0f, 1.0f,
-                0.0f, 0.0f, 1.0f, 1.0f,
-                0.0f, 0.0f, 1.0f, 1.0f,
-
-                1.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 1.0f, 1.0f,
-
-                0.0f, 1.0f, 1.0f, 1.0f,
-                0.0f, 1.0f, 1.0f, 1.0f,
-                0.0f, 1.0f, 1.0f, 1.0f,
-                0.0f, 1.0f, 1.0f, 1.0f,
-
-                1.0f, 1.0f, 0.0f, 1.0f,
-                1.0f, 1.0f, 0.0f, 1.0f,
-                1.0f, 1.0f, 0.0f, 1.0f,
-                1.0f, 1.0f, 0.0f, 1.0f,
             };
 
             uint[] indexArray = new uint[] {
@@ -133,6 +101,44 @@ namespace GrafikaSzeminarium
 
             return new ModelObjectDescriptor() {Vao= vao, Vertices = vertices, Colors = colors, Indices = indices, IndexArrayLength = (uint)indexArray.Length, Gl = Gl};
 
+        }
+
+        // Egy kis kocka szintombjet allitjuk elo a Rubik kockaban elfoglalt helye alapjan
+        // x, y, z erteke -1, 0, 1 lehet (a kocka helye a 3x3x3-as Rubik kockaban)
+        // visszaad 24 csucs * 4 szam -> 96 floatot
+        public static float[] BuildColorArray(int x, int y, int z)
+        {
+            float[] white = { 1.0f, 1.0f, 1.0f, 1.0f };    // felső  (+y)
+            float[] green = { 0.0f, 0.7f, 0.0f, 1.0f };    // elülső (+z)
+            float[] orange = { 1.0f, 0.5f, 0.0f, 1.0f };    // bal    (-x)
+            float[] yellow = { 1.0f, 1.0f, 0.0f, 1.0f };    // alsó   (-y)
+            float[] blue = { 0.0f, 0.0f, 1.0f, 1.0f };    // hátsó  (-z)
+            float[] red = { 1.0f, 0.0f, 0.0f, 1.0f };    // jobb   (+x)
+
+            float[] grey = { 0.5f, 0.5f, 0.5f, 1.0f };    // szürke a belso lapokhoz
+
+            // a lapok sorrednje megegyezik a CreateCube vertexArray sorrendjevel
+            // 0 felso, 1 elülső, 2 bal, 3 alsó, 4 hátsó, 5 jobb
+            float[][] faceColors = new float[6][];
+            faceColors[0] = (y == 1) ? white : grey;   // felső
+            faceColors[1] = (z == 1) ? green : grey;   // elülső
+            faceColors[2] = (x == -1) ? orange : grey;   // bal
+            faceColors[3] = (y == -1) ? yellow : grey;   // alsó
+            faceColors[4] = (z == -1) ? blue : grey;   // hátsó
+            faceColors[5] = (x == 1) ? red : grey;   // jobb
+
+            // osszeakjuk a tombot
+            // minden lapnak 4 csucsa van es mindegyik ugyan azt a szint kapja
+            var colors = new List<float>();
+            for(int face = 0; face < 6; face++) // lapok sorrendbe
+            {
+                for (int vertex = 0; vertex < 4; vertex++) // a lap 4 csucsa
+                {
+                    colors.AddRange(faceColors[face]);
+                }
+            }
+
+            return colors.ToArray();
         }
 
         protected virtual void Dispose(bool disposing)

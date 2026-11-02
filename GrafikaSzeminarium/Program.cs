@@ -12,7 +12,8 @@ namespace GrafikaSzeminarium
 
         private static GL Gl;
 
-        private static ModelObjectDescriptor cube;
+        //3x3x3-as tömb, a kis kocka helye az index (x+1, y+1, z+1)
+        private static ModelObjectDescriptor[,,] cubes = new ModelObjectDescriptor[3, 3, 3];
 
         private static CameraDescriptor camera = new CameraDescriptor();
 
@@ -73,7 +74,8 @@ namespace GrafikaSzeminarium
 
         private static void GraphicWindow_Closing()
         {
-            cube.Dispose();
+            foreach (var c in cubes)
+                c.Dispose();
             Gl.DeleteProgram(program);
         }
 
@@ -87,7 +89,12 @@ namespace GrafikaSzeminarium
                 keyboard.KeyDown += Keyboard_KeyDown;
             }
 
-            cube = ModelObjectDescriptor.CreateCube(Gl);
+            // 27 kis kocka, mind kulon VAO-val es sajat szinnel
+            // x, y, z a kocka helye a racson: -1, 0, 1
+            for (int x = -1; x <= 1; x++)
+                for (int y = -1; y <= 1; y++)
+                    for (int z = -1; z <= 1; z++)
+                        cubes[x + 1, y + 1, z + 1] = ModelObjectDescriptor.CreateCube(Gl, ModelObjectDescriptor.BuildColorArray(x, y, z));
 
             Gl.ClearColor(System.Drawing.Color.White);
             
@@ -132,6 +139,17 @@ namespace GrafikaSzeminarium
             {
                 Console.WriteLine($"Error linking shader {Gl.GetProgramInfoLog(program)}");
             }
+
+            // uniformot csak aktiv programnal lehet beallitani
+            Gl.UseProgram(program);
+
+            // kamera: oldalrol es felulrol nezzen
+            var viewMatrix = Matrix4X4.CreateLookAt(new Vector3D<float>(4f, 3f, 6f), Vector3D<float>.Zero, Vector3D<float>.UnitY);
+            SetMatrix(viewMatrix, ViewMatrixVariableName);
+
+            // az ablak 500x500 -> kepearany 1
+            var projectionMatrix = Matrix4X4.CreatePerspectiveFieldOfView<float>((float)(Math.PI / 4), 1f, 0.1f, 100f);
+            SetMatrix(projectionMatrix, ProjectionMatrixVariableName);
         }
 
         private static void Keyboard_KeyDown(IKeyboard keyboard, Key key, int arg3)
@@ -176,27 +194,15 @@ namespace GrafikaSzeminarium
 
             Gl.UseProgram(program);
 
-            var viewMatrix = Matrix4X4.CreateLookAt(camera.Position, camera.Target, camera.UpVector);
-            SetMatrix(viewMatrix, ViewMatrixVariableName);
-
-            var projectionMatrix = Matrix4X4.CreatePerspectiveFieldOfView<float>((float)(Math.PI / 2), 1024f / 768f, 0.1f, 100f);
-            SetMatrix(projectionMatrix, ProjectionMatrixVariableName);
-
-
-            var modelMatrixCenterCube = Matrix4X4.CreateScale((float)cubeArrangementModel.CenterCubeScale);
-            SetMatrix(modelMatrixCenterCube, ModelMatrixVariableName);
-            DrawModelObject(cube);
-
-            Matrix4X4<float> diamondScale = Matrix4X4.CreateScale(0.25f);
-            Matrix4X4<float> rotx = Matrix4X4.CreateRotationX((float)Math.PI / 4f);
-            Matrix4X4<float> rotz = Matrix4X4.CreateRotationZ((float)Math.PI / 4f);
-            Matrix4X4<float> roty = Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeLocalAngle);
-            Matrix4X4<float> trans = Matrix4X4.CreateTranslation(1f, 1f, 0f);
-            Matrix4X4<float> rotGlobalY = Matrix4X4.CreateRotationY((float)cubeArrangementModel.DiamondCubeGlobalYAngle);
-            Matrix4X4<float> dimondCubeModelMatrix = diamondScale * rotx * rotz * roty * trans * rotGlobalY;
-            SetMatrix(dimondCubeModelMatrix, ModelMatrixVariableName);
-            DrawModelObject(cube);
-
+            for (int x = -1; x <= 1; x++)
+                for (int y = -1; y <= 1; y++)
+                    for (int z = -1; z <= 1; z++)
+                    {
+                        // 0.9-re kicsinyitjuk, igy 0.1 res marad a kockak kozott, aztan a helyere toljuk
+                        var modelMatrix = Matrix4X4.CreateScale(0.9f) * Matrix4X4.CreateTranslation((float)x, (float)y, (float)z);
+                        SetMatrix(modelMatrix, ModelMatrixVariableName);
+                        DrawModelObject(cubes[x + 1, y + 1, z + 1]);
+                    }
         }
 
         private static unsafe void DrawModelObject(ModelObjectDescriptor modelObject)
