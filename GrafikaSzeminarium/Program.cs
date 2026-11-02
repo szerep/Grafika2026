@@ -23,6 +23,13 @@ namespace GrafikaSzeminarium
         private const string ViewMatrixVariableName = "uView";
         private const string ProjectionMatrixVariableName = "uProjection";
 
+        // kamera hol all, es merre nez
+        private static Vector3D<float> cameraPosition = new Vector3D<float>(4f, 3f, 6f);
+        private static float cameraYaw = -0.59f;
+        private static float cameraPitch = -0.39f;
+        private const float MoveStep = 0.3f;
+        private const float TurnStep = 0.05f;
+
         private static readonly string VertexShaderSource = @"
         #version 330 core
         layout (location = 0) in vec3 vPos;
@@ -143,10 +150,6 @@ namespace GrafikaSzeminarium
             // uniformot csak aktiv programnal lehet beallitani
             Gl.UseProgram(program);
 
-            // kamera: oldalrol es felulrol nezzen
-            var viewMatrix = Matrix4X4.CreateLookAt(new Vector3D<float>(4f, 3f, 6f), Vector3D<float>.Zero, Vector3D<float>.UnitY);
-            SetMatrix(viewMatrix, ViewMatrixVariableName);
-
             // az ablak 500x500 -> kepearany 1
             var projectionMatrix = Matrix4X4.CreatePerspectiveFieldOfView<float>((float)(Math.PI / 4), 1f, 0.1f, 100f);
             SetMatrix(projectionMatrix, ProjectionMatrixVariableName);
@@ -154,30 +157,31 @@ namespace GrafikaSzeminarium
 
         private static void Keyboard_KeyDown(IKeyboard keyboard, Key key, int arg3)
         {
+            var forward = GetForward();
+            // jobbra mutato irany: vizszintes, meroleges az elore irannyal
+            var right = new Vector3D<float>(MathF.Cos(cameraYaw), 0f, MathF.Sin(cameraYaw));
             switch (key)
             {
-                case Key.Left:
-                    camera.DecreaseZYAngle();
-                    break;
-                case Key.Right:
-                    camera.IncreaseZYAngle();
-                    break;
-                case Key.Down:
-                    camera.IncreaseDistance();
-                    break;
-                case Key.Up:
-                    camera.DecreaseDistance();
-                    break;
-                case Key.U:
-                    camera.IncreaseZXAngle();
-                    break;
-                case Key.D:
-                    camera.DecreaseZXAngle();
-                    break;
+                // mozgás
+                case Key.W: cameraPosition += forward * MoveStep; break;   // előre
+                case Key.S: cameraPosition -= forward * MoveStep; break;   // hátra
+                case Key.D: cameraPosition += right * MoveStep; break;     // jobbra
+                case Key.A: cameraPosition -= right * MoveStep; break;     // balra
+                case Key.Q: cameraPosition.Y += MoveStep; break;           // fel
+                case Key.Z: cameraPosition.Y -= MoveStep; break;           // le
+
+                // nézési irány: nyilak
+                case Key.Left: cameraYaw -= TurnStep; break;     // balra fordul
+                case Key.Right: cameraYaw += TurnStep; break;     // jobbra fordul
+                case Key.Up: cameraPitch += TurnStep; break;   // felfelé néz
+                case Key.Down: cameraPitch -= TurnStep; break;   // lefelé néz
+
                 case Key.Space:
                     cubeArrangementModel.AnimationEnabled = !cubeArrangementModel.AnimationEnabled;
                     break;
             }
+
+            cameraPitch = Math.Clamp(cameraPitch, -1.5f, 1.5f);
         }
 
         private static void GraphicWindow_Update(double deltaTime)
@@ -194,6 +198,10 @@ namespace GrafikaSzeminarium
 
             Gl.UseProgram(program);
 
+            // a kamera poz es iranyabol mindig  ujraszamoljuk a nezetet
+            var viewMatrix = Matrix4X4.CreateLookAt(cameraPosition, cameraPosition + GetForward(), Vector3D<float>.UnitY);
+            SetMatrix(viewMatrix, ViewMatrixVariableName);
+
             for (int x = -1; x <= 1; x++)
                 for (int y = -1; y <= 1; y++)
                     for (int z = -1; z <= 1; z++)
@@ -203,6 +211,15 @@ namespace GrafikaSzeminarium
                         SetMatrix(modelMatrix, ModelMatrixVariableName);
                         DrawModelObject(cubes[x + 1, y + 1, z + 1]);
                     }
+        }
+
+        // Megmondja, merre nez a kamera
+        private static Vector3D<float> GetForward()
+        {
+            return new Vector3D<float>(
+                MathF.Sin(cameraYaw) * MathF.Cos(cameraPitch),
+                MathF.Sin(cameraPitch),
+                -MathF.Cos(cameraYaw) * MathF.Cos(cameraPitch));
         }
 
         private static unsafe void DrawModelObject(ModelObjectDescriptor modelObject)
