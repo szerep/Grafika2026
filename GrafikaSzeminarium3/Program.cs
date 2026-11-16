@@ -24,6 +24,24 @@ namespace GrafikaSzeminarium
         private const int BoardCount = 18;     // ennyi lapbol all a tubus
         private const float BoardWidth = 1f;   // egy lap szelessege
 
+        private static ModelObjectDescriptor cube;
+        private const string AmbientStrengthVariableName = "uAmbientStrength";
+        private const string DiffuseStrengthVariableName = "uDiffuseStrength";
+        private const string SpecularStrengthVariableName = "uSpecularStrength";
+        private const string AmbientColorVariableName = "uAmbientColor";
+
+        // anyagtulajdonsagok komponensenkent
+        private static Vector3 ambientStrength = new Vector3(0.1f, 0.1f, 0.1f);
+        private static Vector3 diffuseStrength = new Vector3(0.3f, 0.3f, 0.3f);
+        private static Vector3 specularStrength = new Vector3(0.6f, 0.6f, 0.6f);
+
+        // hatterfeny szine
+        private static Vector3 ambientColor = new Vector3(1f, 1f, 1f);
+
+        // A kocka elulso lapjanak szine
+        private static Vector3 faceColor = new Vector3(0f, 1f, 0f);
+
+
         private static CameraDescriptor camera = new CameraDescriptor();
 
         private static CubeArrangementModel cubeArrangementModel = new CubeArrangementModel();
@@ -61,8 +79,7 @@ namespace GrafikaSzeminarium
 
         private static void GraphicWindow_Closing()
         {
-            boardFlat.Dispose();
-            boardSmooth.Dispose();
+            cube.Dispose();
             Gl.DeleteProgram(program);
         }
 
@@ -87,19 +104,12 @@ namespace GrafikaSzeminarium
 
             imGuiController = new ImGuiController(Gl, graphicWindow, inputContext);
 
-            // ket lap: Az egyiknek meroleges, a masiknak 10 fokkal eltero szelso normalisa van
-            float halfStep = MathF.PI / BoardCount;
-            boardFlat = ModelObjectDescriptor.CreateBoard(Gl, 0f);
-            boardSmooth = ModelObjectDescriptor.CreateBoard(Gl, halfStep);
-
-            // a kamera indulaskor 1 egysegre van, itt messzebb es kicsit felulrol nezzuk
-            for (int i = 0; i < 22; i++) camera.IncreaseDistance();
-            for (int i = 0; i < 3; i++) camera.IncreaseZXAngle();
+            cube = ModelObjectDescriptor.CreateCube(Gl);
 
             Gl.ClearColor(System.Drawing.Color.White);
             
-            //Gl.Enable(EnableCap.CullFace);
-            //Gl.CullFace(TriangleFace.Back);
+            Gl.Enable(EnableCap.CullFace);
+            Gl.CullFace(TriangleFace.Back);
 
             Gl.Enable(EnableCap.DepthTest);
             Gl.DepthFunc(DepthFunction.Lequal);
@@ -201,24 +211,30 @@ namespace GrafikaSzeminarium
             SetUniform3(LightPositionVariableName, new Vector3(camera.Position.X, camera.Position.Y, camera.Position.Z));
             SetUniform3(ViewPositionVariableName, new Vector3(camera.Position.X, camera.Position.Y, camera.Position.Z));
             SetUniform1(ShinenessVariableName, shininess);
+            SetUniform3(AmbientStrengthVariableName, ambientStrength);
+            SetUniform3(DiffuseStrengthVariableName, diffuseStrength);
+            SetUniform3(SpecularStrengthVariableName, specularStrength);
+            SetUniform3(AmbientColorVariableName, ambientColor);
 
             var viewMatrix = Matrix4X4.CreateLookAt(camera.Position, camera.Target, camera.UpVector);
             SetMatrix(viewMatrix, ViewMatrixVariableName);
 
             var projectionMatrix = Matrix4X4.CreatePerspectiveFieldOfView<float>((float)(Math.PI / 2), 1024f / 768f, 0.1f, 100f);
             SetMatrix(projectionMatrix, ProjectionMatrixVariableName);
-
-
-            float stepAngle = 2 * MathF.PI / BoardCount; // 20 fok
-            float distance = (BoardWidth /2 ) / MathF.Tan(stepAngle / 2); // a lap tavolsaga a tubus kozepetol
-            float tubeOffset = distance * 1.2f; // a ket tubus helye
-
-            DrawTube(boardFlat, -tubeOffset, stepAngle, distance); // bal meroleges normalis
-            DrawTube(boardSmooth, tubeOffset, stepAngle, distance); // jobb szamolt normalis
+            SetModelMatrix(Matrix4X4.CreateScale(1f));
+            DrawModelObject(cube);
+            
 
             //ImGuiNET.ImGui.ShowDemoWindow();
             ImGuiNET.ImGui.Begin("Lighting", ImGuiNET.ImGuiWindowFlags.AlwaysAutoResize | ImGuiNET.ImGuiWindowFlags.NoCollapse);
             ImGuiNET.ImGui.SliderFloat("Shininess", ref shininess, 5, 100);
+            ImGuiNET.ImGui.SliderFloat3("Ambient (R,G,B)", ref ambientStrength, 0f, 1f);
+            ImGuiNET.ImGui.SliderFloat3("Diffuse (R,G,B)", ref diffuseStrength, 0f, 1f);
+            ImGuiNET.ImGui.SliderFloat3("Specular (R,G,B)", ref specularStrength, 0f, 1f);
+            ImGuiNET.ImGui.SliderFloat3("Hatterfeny szine", ref ambientColor, 0f, 1f);
+            // a szinvalaszto true-t ad vissza, ha valtoztattak rajta
+            if (ImGuiNET.ImGui.ColorEdit3("Kocka elulso lapja", ref faceColor))
+                cube.SetFaceColor(1, faceColor.X, faceColor.Y, faceColor.Z);
             ImGuiNET.ImGui.End();
 
             imGuiController.Render();

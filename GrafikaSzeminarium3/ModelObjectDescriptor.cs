@@ -18,6 +18,7 @@ namespace GrafikaSzeminarium
         public uint Colors { get; private set; }
         public uint Indices { get; private set; }
         public uint IndexArrayLength { get; private set; }
+        public float[] ColorArray { get; private set; }
 
         private GL Gl;
 
@@ -209,8 +210,27 @@ namespace GrafikaSzeminarium
             Gl.BufferData(GLEnum.ElementArrayBuffer, (ReadOnlySpan<uint>)indexArray.AsSpan(), GLEnum.StaticDraw);
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, 0);
 
-            return new ModelObjectDescriptor() {Vao= vao, Vertices = vertices, Colors = colors, Indices = indices, IndexArrayLength = (uint)indexArray.Length, Gl = Gl};
+            return new ModelObjectDescriptor() {Vao= vao, Vertices = vertices, Colors = colors, Indices = indices, IndexArrayLength = (uint)indexArray.Length, Gl = Gl, ColorArray = colorArray};
 
+        }
+
+        // A kocka egy lapjanak szinet allitja at
+        // face: 0 felso, 1 elulso, 2 bal, 3 also, 4 hatso, 5 jobb
+        public void SetFaceColor(int face, float r, float g, float b)
+        {
+            // egy lapnak 4 csucsa van, mindegyiknek 4 szine (r, g, b, a)
+            for (int vertex = 0; vertex < 4; vertex++)
+            {
+                int start = (face * 4 + vertex) * 4;
+                ColorArray[start] = r;
+                ColorArray[start + 1] = g;
+                ColorArray[start + 2] = b;
+            }
+
+            // a modositott szintombot ujra feltoltjuk
+            Gl.BindBuffer(GLEnum.ArrayBuffer, Colors);
+            Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)ColorArray.AsSpan(), GLEnum.StaticDraw);
+            Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
         }
 
         protected virtual void Dispose(bool disposing)

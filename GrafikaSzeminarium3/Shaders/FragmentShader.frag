@@ -7,6 +7,13 @@ uniform vec3 uViewPos;
 
 uniform float uShininess;
 
+// A beegetett konstansok helyett 3 elemu vektorok (R, G, B kulon allithato)
+uniform vec3 uAmbientStrength;
+uniform vec3 uDiffuseStrength;
+uniform vec3 uSpecularStrength;
+// A hatterfeny szine
+uniform vec3 uAmbientColor;
+
 		
 in vec4 outCol;
 in vec3 outNormal;
@@ -14,21 +21,19 @@ in vec3 outWorldPosition;
 
 void main()
 {
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * uLightColor;
+    vec3 ambient = uAmbientStrength * uAmbientColor;
 
-    float diffuseStrength = 0.3;
     vec3 norm = normalize(outNormal);
     vec3 lightDir = normalize(uLightPos - outWorldPosition);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * uLightColor * diffuseStrength;
+    vec3 diffuse = diff * uLightColor * uDiffuseStrength;
 
-    float specularStrength = 0.6;
     vec3 viewDir = normalize(uViewPos - outWorldPosition);
     vec3 reflectDir = reflect(-lightDir, norm);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), uShininess);
+    vec3 specular = spec * uLightColor * uSpecularStrength;
 
-    vec3 result = (ambient + diffuse + spec) * outCol.rgb;
+    vec3 result = (ambient + diffuse + specular) * outCol.rgb;
 
     FragColor = vec4(result, outCol.w);
 }
