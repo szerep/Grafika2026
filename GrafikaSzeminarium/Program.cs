@@ -2,7 +2,9 @@
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+using System.Numerics;
 using Szeminarium;
+using Silk.NET.OpenGL.Extensions.ImGui;
 
 namespace GrafikaSzeminarium
 {
@@ -11,6 +13,8 @@ namespace GrafikaSzeminarium
         private static IWindow graphicWindow;
 
         private static GL Gl;
+
+        private static ImGuiController imGuiController;
 
         //3x3x3-as tömb, a kis kocka helye az index (x+1, y+1, z+1)
         private static ModelObjectDescriptor[,,] cubes = new ModelObjectDescriptor[3, 3, 3];
@@ -23,6 +27,19 @@ namespace GrafikaSzeminarium
         private const string ViewMatrixVariableName = "uView";
         private const string ProjectionMatrixVariableName = "uProjection";
         private const string SliceRotationVariableName = "uSliceRotation";
+
+        private const string NormalMatrixVariableName = "uNormal";
+        private const string LightColorVariableName = "uLightColor";
+        private const string LightPositionVariableName = "uLightPos";
+        private const string ViewPositionVariableName = "uViewPos";
+        private const string ShinenessVariableName = "uShininess";
+
+        private static float shininess = 50;
+
+        // a fenyforras szine es pozicioja
+        private static Vector3 lightColor = new Vector3(1f, 1f, 1f);
+        private static Vector3 lightPosition = new Vector3(3f, 5f, 5f);
+
         // kamera hol all, es merre nez
         private static Vector3D<float> cameraPosition = new Vector3D<float>(4f, 3f, 6f);
         private static float cameraYaw = -0.59f;
@@ -41,18 +58,25 @@ namespace GrafikaSzeminarium
         #version 330 core
         layout (location = 0) in vec3 vPos;
 		layout (location = 1) in vec4 vCol;
+        layout (location = 2) in vec3 vNormal;
 
         uniform mat4 uModel;
+        uniform mat3 uNormal;
         uniform mat4 uView;
         uniform mat4 uProjection;
         uniform mat4 uSliceRotation;   // szelet forgatasa
 
 		out vec4 outCol;
+        out vec3 outNormal;
+        out vec3 outWorldPosition;
         
         void main()
         {
-			outCol = vCol;
-            gl_Position = uProjection*uView*uSliceRotation*uModel*vec4(vPos.x, vPos.y, vPos.z, 1.0);
+            outCol = vCol;
+            // a normalist es a poziciot is ugyanugy mozgatjuk: eloszor a modell, utana a szelet forgatasa
+            outNormal = mat3(uSliceRotation) * (uNormal * vNormal);
+            outWorldPosition = vec3(uSliceRotation * uModel * vec4(vPos, 1.0));
+            gl_Position = uProjection * uView * uSliceRotation * uModel * vec4(vPos, 1.0);
         }
         ";
 
@@ -60,12 +84,35 @@ namespace GrafikaSzeminarium
         private static readonly string FragmentShaderSource = @"
         #version 330 core
         out vec4 FragColor;
-		
-		in vec4 outCol;
+
+        uniform vec3 uLightColor;
+        uniform vec3 uLightPos;
+        uniform vec3 uViewPos;
+
+        uniform float uShininess;
+
+        in vec4 outCol;
+        in vec3 outNormal;
+        in vec3 outWorldPosition;
 
         void main()
         {
-            FragColor = outCol;
+            float ambientStrength = 0.2;
+            vec3 ambient = ambientStrength * uLightColor;
+
+            float diffuseStrength = 0.8;
+            vec3 norm = normalize(outNormal);
+            vec3 lightDir = normalize(uLightPos - outWorldPosition);
+            float diff = max(dot(norm, lightDir), 0.0);
+            vec3 diffuse = diff * uLightColor * diffuseStrength;
+
+            vec3 viewDir = normalize(uViewPos - outWorldPosition);
+            vec3 reflectDir = reflect(-lightDir, norm);
+            float spec = pow(max(dot(viewDir, reflectDir), 0.0), uShininess);
+
+            vec3 result = (ambient + diffuse + spec) * outCol.rgb;
+
+            FragColor = vec4(result, outCol.w);
         }
         ";
 
@@ -103,6 +150,8 @@ namespace GrafikaSzeminarium
             {
                 keyboard.KeyDown += Keyboard_KeyDown;
             }
+
+            imGuiController = new ImGuiController(Gl, graphicWindow, inputContext);
 
             // 27 kis kocka, mind kulon VAO-val es sajat szinnel
             // x, y, z a kocka helye a racson: -1, 0, 1
@@ -165,6 +214,8 @@ namespace GrafikaSzeminarium
 
         private static void Keyboard_KeyDown(IKeyboard keyboard, Key key, int arg3)
         {
+            if (ImGuiNET.ImGui.GetIO().WantTextInput)
+                return;
             var forward = GetForward();
             // jobbra mutato irany: vizszintes, meroleges az elore irannyal
             var right = new Vector3D<float>(MathF.Cos(cameraYaw), 0f, MathF.Sin(cameraYaw));
@@ -200,6 +251,7 @@ namespace GrafikaSzeminarium
             // NO OpenGL
             // make it threadsafe
             cubeArrangementModel.AdvanceTime(deltaTime);
+            imGuiController.Update((float)deltaTime);
             // egy kepkockanal ennyit fordulhat
             float step = SliceSpeed * (float)deltaTime;
 
@@ -216,6 +268,11 @@ namespace GrafikaSzeminarium
 
             Gl.UseProgram(program);
 
+            SetUniform3(LightColorVariableName, lightColor);
+            SetUniform3(LightPositionVariableName, lightPosition);
+            SetUniform3(ViewPositionVariableName, new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z));
+            SetUniform1(ShinenessVariableName, shininess);
+
             // a kamera poz es iranyabol mindig  ujraszamoljuk a nezetet
             var viewMatrix = Matrix4X4.CreateLookAt(cameraPosition, cameraPosition + GetForward(), Vector3D<float>.UnitY);
             SetMatrix(viewMatrix, ViewMatrixVariableName);
@@ -226,7 +283,7 @@ namespace GrafikaSzeminarium
                     {
                         // 0.9-re kicsinyitjuk, igy 0.1 res marad a kockak kozott, aztan a helyere toljuk
                         var modelMatrix = Matrix4X4.CreateScale(0.9f) * Matrix4X4.CreateTranslation((float)x, (float)y, (float)z);
-                        SetMatrix(modelMatrix, ModelMatrixVariableName);
+                        SetModelMatrix(modelMatrix);
                         // a felso reteg (y == 1) kapja a forgatast, a tobbi egysegmatrixot
                         Matrix4X4<float> sliceRotation = Matrix4X4<float>.Identity;
                         if (y == 1)
@@ -234,6 +291,29 @@ namespace GrafikaSzeminarium
                         SetMatrix(sliceRotation, SliceRotationVariableName);
                         DrawModelObject(cubes[x + 1, y + 1, z + 1]);
                     }
+
+            ImGuiNET.ImGui.Begin("Feny", ImGuiNET.ImGuiWindowFlags.AlwaysAutoResize | ImGuiNET.ImGuiWindowFlags.NoCollapse);
+
+            // a megvilagitas szinosszetetele: 3 csuszka
+            ImGuiNET.ImGui.SliderFloat("Piros", ref lightColor.X, 0f, 1f);
+            ImGuiNET.ImGui.SliderFloat("Zold", ref lightColor.Y, 0f, 1f);
+            ImGuiNET.ImGui.SliderFloat("Kek", ref lightColor.Z, 0f, 1f);
+
+            // a fenyforras helye: 3 szoveges mezo
+            ImGuiNET.ImGui.InputFloat("Feny X", ref lightPosition.X);
+            ImGuiNET.ImGui.InputFloat("Feny Y", ref lightPosition.Y);
+            ImGuiNET.ImGui.InputFloat("Feny Z", ref lightPosition.Z);
+
+            // a szelet forgatasa gombokkal
+            if (ImGuiNET.ImGui.Button("Forgatas +90"))
+                sliceTargetAngle += MathF.PI / 2;
+            ImGuiNET.ImGui.SameLine();
+            if (ImGuiNET.ImGui.Button("Forgatas -90"))
+                sliceTargetAngle -= MathF.PI / 2;
+
+            ImGuiNET.ImGui.End();
+
+            imGuiController.Render();
         }
 
         // Megmondja, merre nez a kamera
@@ -243,6 +323,56 @@ namespace GrafikaSzeminarium
                 MathF.Sin(cameraYaw) * MathF.Cos(cameraPitch),
                 MathF.Sin(cameraPitch),
                 -MathF.Cos(cameraYaw) * MathF.Cos(cameraPitch));
+        }
+
+        private static unsafe void SetModelMatrix(Matrix4X4<float> modelMatrix)
+        {
+            SetMatrix(modelMatrix, ModelMatrixVariableName);
+
+            // a normalmatrixot is beallitjuk
+            int location = Gl.GetUniformLocation(program, NormalMatrixVariableName);
+            if (location == -1)
+            {
+                throw new Exception($"{NormalMatrixVariableName} uniform not found on shader.");
+            }
+
+            // G = (M^-1)^T
+            var modelMatrixWithoutTranslation = new Matrix4X4<float>(modelMatrix.Row1, modelMatrix.Row2, modelMatrix.Row3, modelMatrix.Row4);
+            modelMatrixWithoutTranslation.M41 = 0;
+            modelMatrixWithoutTranslation.M42 = 0;
+            modelMatrixWithoutTranslation.M43 = 0;
+            modelMatrixWithoutTranslation.M44 = 1;
+
+            Matrix4X4<float> modelInvers;
+            Matrix4X4.Invert<float>(modelMatrixWithoutTranslation, out modelInvers);
+            Matrix3X3<float> normalMatrix = new Matrix3X3<float>(Matrix4X4.Transpose(modelInvers));
+
+            Gl.UniformMatrix3(location, 1, false, (float*)&normalMatrix);
+            CheckError();
+        }
+
+        private static unsafe void SetUniform1(string uniformName, float uniformValue)
+        {
+            int location = Gl.GetUniformLocation(program, uniformName);
+            if (location == -1)
+            {
+                throw new Exception($"{uniformName} uniform not found on shader.");
+            }
+
+            Gl.Uniform1(location, uniformValue);
+            CheckError();
+        }
+
+        private static unsafe void SetUniform3(string uniformName, Vector3 uniformValue)
+        {
+            int location = Gl.GetUniformLocation(program, uniformName);
+            if (location == -1)
+            {
+                throw new Exception($"{uniformName} uniform not found on shader.");
+            }
+
+            Gl.Uniform3(location, uniformValue);
+            CheckError();
         }
 
         private static unsafe void DrawModelObject(ModelObjectDescriptor modelObject)

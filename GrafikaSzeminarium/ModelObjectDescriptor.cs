@@ -27,37 +27,43 @@ namespace GrafikaSzeminarium
             Gl.BindVertexArray(vao);
 
             // counter clockwise is front facing
+            // minden csucs: x, y, z, normal x, normal y, normal z
             var vertexArray = new float[] {
-                -0.5f, 0.5f, 0.5f,
-                0.5f, 0.5f, 0.5f,
-                0.5f, 0.5f, -0.5f,
-                -0.5f, 0.5f, -0.5f,
+                // top face
+                -0.5f, 0.5f, 0.5f, 0f, 1f, 0f,
+                0.5f, 0.5f, 0.5f, 0f, 1f, 0f,
+                0.5f, 0.5f, -0.5f, 0f, 1f, 0f,
+                -0.5f, 0.5f, -0.5f, 0f, 1f, 0f,
 
-                -0.5f, 0.5f, 0.5f,
-                -0.5f, -0.5f, 0.5f,
-                0.5f, -0.5f, 0.5f,
-                0.5f, 0.5f, 0.5f,
+                // front face
+                -0.5f, 0.5f, 0.5f, 0f, 0f, 1f,
+                -0.5f, -0.5f, 0.5f, 0f, 0f, 1f,
+                0.5f, -0.5f, 0.5f, 0f, 0f, 1f,
+                0.5f, 0.5f, 0.5f, 0f, 0f, 1f,
 
-                -0.5f, 0.5f, 0.5f,
-                -0.5f, 0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f, 0.5f,
+                // left face
+                -0.5f, 0.5f, 0.5f, -1f, 0f, 0f,
+                -0.5f, 0.5f, -0.5f, -1f, 0f, 0f,
+                -0.5f, -0.5f, -0.5f, -1f, 0f, 0f,
+                -0.5f, -0.5f, 0.5f, -1f, 0f, 0f,
 
-                -0.5f, -0.5f, 0.5f,
-                0.5f, -0.5f, 0.5f,
-                0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
+                // bottom face
+                -0.5f, -0.5f, 0.5f, 0f, -1f, 0f,
+                0.5f, -0.5f, 0.5f, 0f, -1f, 0f,
+                0.5f, -0.5f, -0.5f, 0f, -1f, 0f,
+                -0.5f, -0.5f, -0.5f, 0f, -1f, 0f,
 
-                0.5f, 0.5f, -0.5f,
-                -0.5f, 0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
+                // back face
+                0.5f, 0.5f, -0.5f, 0f, 0f, -1f,
+                -0.5f, 0.5f, -0.5f, 0f, 0f, -1f,
+                -0.5f, -0.5f, -0.5f, 0f, 0f, -1f,
+                0.5f, -0.5f, -0.5f, 0f, 0f, -1f,
 
-                0.5f, 0.5f, 0.5f,
-                0.5f, 0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, 0.5f,
-
+                // right face
+                0.5f, 0.5f, 0.5f, 1f, 0f, 0f,
+                0.5f, 0.5f, -0.5f, 1f, 0f, 0f,
+                0.5f, -0.5f, -0.5f, 1f, 0f, 0f,
+                0.5f, -0.5f, 0.5f, 1f, 0f, 0f,
             };
 
             uint[] indexArray = new uint[] {
@@ -83,8 +89,14 @@ namespace GrafikaSzeminarium
             uint vertices = Gl.GenBuffer();
             Gl.BindBuffer(GLEnum.ArrayBuffer, vertices);
             Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)vertexArray.AsSpan(), GLEnum.StaticDraw);
-            Gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, null);
+            // 0 -> pozicio, 2 -> normalis (egy csucs: 3 pozicio + 3 normalis float)
+            uint offsetPos = 0;
+            uint offsetNormals = offsetPos + 3 * sizeof(float);
+            uint vertexSize = offsetNormals + 3 * sizeof(float);
+            Gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, vertexSize, (void*)offsetPos);
             Gl.EnableVertexAttribArray(0);
+            Gl.VertexAttribPointer(2, 3, VertexAttribPointerType.Float, true, vertexSize, (void*)offsetNormals);
+            Gl.EnableVertexAttribArray(2);
             Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
 
             uint colors = Gl.GenBuffer();
